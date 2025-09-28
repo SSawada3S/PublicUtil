@@ -66,6 +66,7 @@ UNIT_TOKEN = r"[a-zA-Zぁ-んァ-ン一-龥]+"
 AMOUNT_RE = re.compile(rf"(?P<num>{NUM_TOKEN})(?P<scale>{SCALE_TOKEN})(?P<unit>{UNIT_TOKEN})")
 
 def extract_amounts(text: str):
+    text=text.replace("．",".")
     results = []
     for m in AMOUNT_RE.finditer(text):
         raw = m.group(0)
