@@ -12,17 +12,21 @@ def preprocess_japanese_text(text):
   return text
 
 ### 数字に対する対応 ###
+import re
 
 # ---- 全角→半角（数字とドット）、カンマ除去 ----
 _Z2H = str.maketrans({**{chr(ord('０')+i): str(i) for i in range(10)}, '．': '.'})
 def _normalize_numstr(s: str) -> str:
     return s.translate(_Z2H).replace(',', '')
 
-# ---- 漢数字対応 ----
+# ---- 漢数字対応（十・百・千まで対応）----
 KANJI_DIG = {'零':0,'〇':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9}
 KANJI_UNIT = {'十':10,'百':100,'千':1000}
 
 def _kanji_basic_to_int(s: str) -> int:
+    """
+    漢数字だけの文字列（例: '二十五', '三百二十', '千二百三十四'）を整数に変換
+    """
     total = 0
     tmp = 0
     has_any = False
@@ -39,11 +43,15 @@ def _kanji_basic_to_int(s: str) -> int:
     return total if has_any else 0
 
 def _parse_number_token(tok: str) -> float:
+    """
+    半角/全角数字、小数、カンマ付き、または漢数字を float に変換
+    """
     t = _normalize_numstr(tok)
-    try:
+    # 数字ならそのまま
+    if re.fullmatch(r"\d+(\.\d+)?", t):
         return float(t)
-    except ValueError:
-        return float(_kanji_basic_to_int(tok))
+    # 漢数字の場合
+    return float(_kanji_basic_to_int(tok))
 
 # ---- 倍率テーブル ----
 SCALE_FACTORS = {
@@ -60,13 +68,13 @@ SCALE_FACTORS = {
 }
 
 # ---- 正規表現 ----
-# 数値だけ（整数・小数・漢数字）
-NUM_TOKEN = r"[0-9０-９,．\.一二三四五六七八九〇零]+"
+# 数値トークン: 数字・全角数字・小数点・漢数字
+NUM_TOKEN = r"[0-9０-９,．\.一二三四五六七八九〇零十百千]+"
 
-# 倍率（兆, 億, 百, 千...）
+# 倍率（任意）
 SCALE_TOKEN = r"(兆|十億|億|千万|百万|十万|万|千|百|十)?"
 
-# 単位（円, 株, 件, 口 など）
+# 単位（円, 株, 件 など）
 UNIT_TOKEN = r"[a-zA-Zぁ-んァ-ン一-龥]+"
 
 AMOUNT_RE = re.compile(rf"(?P<num>{NUM_TOKEN})(?P<scale>{SCALE_TOKEN})(?P<unit>{UNIT_TOKEN})")
@@ -76,24 +84,15 @@ def extract_amounts(text: str):
     results = []
     for m in AMOUNT_RE.finditer(text):
         raw = m.group(0)
-        num_tok = m.group('num')
-        scale_tok = m.group('scale') or ""
-        unit_str = m.group('unit')
+        num_tok = m.group("num")
+        scale_tok = m.group("scale") or ""
+        unit_str = m.group("unit")
 
-        # 数値変換
+        # 数値に変換
         n = _parse_number_token(num_tok)
 
-        # 倍率を適用（scale_tok が複数単位でも順番にかける）
-        factor = 1
-        while scale_tok:
-            for k, v in SCALE_FACTORS.items():
-                if scale_tok.startswith(k):
-                    factor *= v
-                    scale_tok = scale_tok[len(k):]
-                    break
-            else:
-                break
-
+        # 倍率を適用
+        factor = SCALE_FACTORS.get(scale_tok, 1)
         results.append((raw, n * factor, unit_str))
     return results
 
