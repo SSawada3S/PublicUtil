@@ -60,10 +60,16 @@ SCALE_FACTORS = {
 }
 
 # ---- 正規表現 ----
-NUM_TOKEN = r"[0-9０-９,．\.一二三四五六七八九〇零十百千]+"
+# 数値だけ（整数・小数・漢数字）
+NUM_TOKEN = r"[0-9０-９,．\.一二三四五六七八九〇零]+"
+
+# 倍率（兆, 億, 百, 千...）
+SCALE_TOKEN = r"(兆|十億|億|千万|百万|十万|万|千|百|十)?"
+
+# 単位（円, 株, 件, 口 など）
 UNIT_TOKEN = r"[a-zA-Zぁ-んァ-ン一-龥]+"
 
-AMOUNT_RE = re.compile(rf"(?P<num>{NUM_TOKEN})(?P<scale>(兆|十億|億|千万|百万|十万|万|千|百|十)*)?(?P<unit>{UNIT_TOKEN})")
+AMOUNT_RE = re.compile(rf"(?P<num>{NUM_TOKEN})(?P<scale>{SCALE_TOKEN})(?P<unit>{UNIT_TOKEN})")
 
 # ---- 本体 ----
 def extract_amounts(text: str):
